@@ -28,14 +28,19 @@ function getJumpDomain() {
     return normalizeDomain(process.env.JUMP_DOMAIN, 'JUMP_DOMAIN');
 }
 
+function getPublicScheme() {
+    const scheme = (process.env.PUBLIC_SCHEME || 'https').trim().toLowerCase();
+    return scheme === 'http' ? 'http' : 'https';
+}
+
 function buildShortUrl(code) {
-    return `http://${getShortDomain()}/${code}`;
+    return `${getPublicScheme()}://${getShortDomain()}/${code}`;
 }
 
 function buildCraftedUrl(targetUrl, fakeDomain) {
     const jumpDomain = getJumpDomain();
     const fake = fakeDomain || 'mall.bilibili.com';
-    return `http://${jumpDomain}://${fake}?url=${encodeURIComponent(targetUrl)}`;
+    return `${getPublicScheme()}://${jumpDomain}://${fake}?url=${encodeURIComponent(targetUrl)}`;
 }
 
 // 生成短代码
