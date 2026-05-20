@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # MySQL数据库
   mysql:
@@ -13,8 +11,6 @@ services:
       MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
     volumes:
       - mysql_data:/var/lib/mysql
-    ports:
-      - "3306:3306"
     networks:
       - shortlink-network
     healthcheck:
@@ -31,8 +27,6 @@ services:
     command: redis-server --appendonly yes
     volumes:
       - redis_data:/data
-    ports:
-      - "6379:6379"
     networks:
       - shortlink-network
     healthcheck:
@@ -55,8 +49,6 @@ services:
       REDIS_URL: redis://redis:6379
       JUMP_DOMAIN: ${JUMP_DOMAIN:-jump.yourdomain.com}
       SHORT_DOMAIN: ${SHORT_DOMAIN:-s.yourdomain.com}
-    ports:
-      - "3000:3000"
     depends_on:
       mysql:
         condition: service_healthy
@@ -71,7 +63,7 @@ services:
     container_name: shortlink-frontend
     restart: always
     ports:
-      - "80:80"
+      - "${FRONTEND_PORT:-18765}:80"
     depends_on:
       - backend
     networks:
