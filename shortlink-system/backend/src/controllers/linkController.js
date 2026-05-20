@@ -1,6 +1,43 @@
 const { getPool, getRedis } = require('../models/database');
 const crypto = require('crypto');
 
+function normalizeDomain(value, name) {
+    if (!value || !value.trim()) {
+        throw new Error(`${name} must be configured as a domain name`);
+    }
+
+    const domain = value.trim()
+        .replace(/^https?:\/\//i, '')
+        .replace(/\/.*$/, '');
+
+    const isIpAddress = /^(\d{1,3}\.){3}\d{1,3}$/.test(domain) || domain.includes(':');
+    const isLocalhost = domain.toLowerCase() === 'localhost';
+
+    if (isIpAddress || isLocalhost) {
+        throw new Error(`${name} must be a domain name, not an IP address`);
+    }
+
+    return domain;
+}
+
+function getShortDomain() {
+    return normalizeDomain(process.env.SHORT_DOMAIN, 'SHORT_DOMAIN');
+}
+
+function getJumpDomain() {
+    return normalizeDomain(process.env.JUMP_DOMAIN, 'JUMP_DOMAIN');
+}
+
+function buildShortUrl(code) {
+    return `http://${getShortDomain()}/${code}`;
+}
+
+function buildCraftedUrl(targetUrl, fakeDomain) {
+    const jumpDomain = getJumpDomain();
+    const fake = fakeDomain || 'mall.bilibili.com';
+    return `http://${jumpDomain}://${fake}?url=${encodeURIComponent(targetUrl)}`;
+}
+
 // 生成短代码
 function generateCode(length = 6) {
     return crypto.randomBytes(length).toString('base64')
@@ -33,10 +70,8 @@ async function createLink(req, res) {
             shortCode = generateCode(8);
         }
 
-        // 构造畸形URL
-        const jumpDomain = process.env.JUMP_DOMAIN || 'jump.yourdomain.com';
         const fake = fakeDomain || 'mall.bilibili.com';
-        const craftedUrl = `http://${jumpDomain}://${fake}?url=${encodeURIComponent(url)}`;
+        const craftedUrl = buildCraftedUrl(url, fake);
 
         // 插入数据库
         const [result] = await pool.query(
@@ -47,7 +82,7 @@ async function createLink(req, res) {
         // 缓存到Redis
         await redis.set(`link:${shortCode}`, craftedUrl, { EX: 86400 }); // 24小时过期
 
-        const shortUrl = `http://${process.env.SHORT_DOMAIN || 's.yourdomain.com'}/${shortCode}`;
+        const shortUrl = buildShortUrl(shortCode);
 
         res.json({
             success: true,
@@ -114,10 +149,8 @@ async function createBatchLinks(req, res) {
                     shortCode = generateCode(8);
                 }
 
-                // 构造畸形URL
-                const jumpDomain = process.env.JUMP_DOMAIN || 'jump.yourdomain.com';
                 const fake = fakeDomain || 'mall.bilibili.com';
-                const craftedUrl = `http://${jumpDomain}://${fake}?url=${encodeURIComponent(url)}`;
+                const craftedUrl = buildCraftedUrl(url, fake);
 
                 // 插入数据库
                 const [result] = await pool.query(
@@ -128,7 +161,7 @@ async function createBatchLinks(req, res) {
                 // 缓存到Redis
                 await redis.set(`link:${shortCode}`, craftedUrl, { EX: 86400 });
 
-                const shortUrl = `http://${process.env.SHORT_DOMAIN || 's.yourdomain.com'}/${shortCode}`;
+                const shortUrl = buildShortUrl(shortCode);
 
                 results.push({
                     line: i + 1,
@@ -190,10 +223,9 @@ async function getLinks(req, res) {
         );
 
         // 添加短链接URL
-        const shortDomain = process.env.SHORT_DOMAIN || 's.yourdomain.com';
         const linksWithUrl = links.map(link => ({
             ...link,
-            shortUrl: `http://${shortDomain}/${link.code}`
+            shortUrl: buildShortUrl(link.code)
         }));
 
         res.json({
@@ -226,10 +258,9 @@ async function getLink(req, res) {
             return res.status(404).json({ error: 'Link not found' });
         }
 
-        const shortDomain = process.env.SHORT_DOMAIN || 's.yourdomain.com';
         const link = {
             ...links[0],
-            shortUrl: `http://${shortDomain}/${links[0].code}`
+            shortUrl: buildShortUrl(links[0].code)
         };
 
         res.json({ success: true, data: link });
@@ -262,8 +293,7 @@ async function updateLink(req, res) {
         const newFakeDomain = fakeDomain !== undefined ? fakeDomain : link.fake_domain;
 
         // 重新构造畸形URL
-        const jumpDomain = process.env.JUMP_DOMAIN || 'jump.yourdomain.com';
-        const craftedUrl = `http://${jumpDomain}://${newFakeDomain}?url=${encodeURIComponent(newUrl)}`;
+        const craftedUrl = buildCraftedUrl(newUrl, newFakeDomain);
 
         await pool.query(
             'UPDATE links SET title = ?, target_url = ?, fake_domain = ?, crafted_url = ? WHERE id = ?',
