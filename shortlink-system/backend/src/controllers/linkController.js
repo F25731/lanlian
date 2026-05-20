@@ -34,7 +34,7 @@ function getPublicScheme() {
 }
 
 function buildShortUrl(code) {
-    return `${getPublicScheme()}://${getShortDomain()}/${code}`;
+    return `${getPublicScheme()}://${getShortDomain()}/r/${code}`;
 }
 
 function buildCraftedUrl(targetUrl, fakeDomain) {
