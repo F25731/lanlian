@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>短链接管理系统</title>
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+</head>
+<body>
+    <div id="app">
+        <div class="container">
+            <!-- 头部 -->
+            <header class="header">
+                <h1>🔗 短链接管理系统</h1>
+                <div class="stats">
+                    <div class="stat-item">
+                        <span class="stat-label">总链接数</span>
+                        <span class="stat-value">{{ stats.totalLinks }}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">总访问量</span>
+                        <span class="stat-value">{{ stats.totalVisits }}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">今日新增</span>
+                        <span class="stat-value">{{ stats.todayLinks }}</span>
+                    </div>
+                </div>
+            </header>
+
+            <!-- 标签页 -->
+            <div class="tabs">
+                <button
+                    class="tab-btn"
+                    :class="{ active: activeTab === 'create' }"
+                    @click="activeTab = 'create'">
+                    创建短链接
+                </button>
+                <button
+                    class="tab-btn"
+                    :class="{ active: activeTab === 'batch' }"
+                    @click="activeTab = 'batch'">
+                    批量创建
+                </button>
+                <button
+                    class="tab-btn"
+                    :class="{ active: activeTab === 'manage' }"
+                    @click="activeTab = 'manage'; loadLinks()">
+                    管理链接
+                </button>
+            </div>
+
+            <!-- 创建单个短链接 -->
+            <div v-show="activeTab === 'create'" class="tab-content">
+                <div class="form-card">
+                    <h2>创建单个短链接</h2>
+                    <form @submit.prevent="createSingleLink">
+                        <div class="form-group">
+                            <label>标题（可选）</label>
+                            <input
+                                v-model="singleForm.title"
+                                type="text"
+                                placeholder="例如：概率论学习资料"
+                                class="form-input">
+                        </div>
+                        <div class="form-group">
+                            <label>目标URL *</label>
+                            <input
+                                v-model="singleForm.url"
+                                type="url"
+                                placeholder="https://pan.quark.cn/s/xxxxx"
+                                class="form-input"
+                                required>
+                        </div>
+                        <div class="form-group">
+                            <label>短代码（留空自动生成）</label>
+                            <input
+                                v-model="singleForm.code"
+                                type="text"
+                                placeholder="例如：math01"
+                                class="form-input">
+                        </div>
+                        <div class="form-group">
+                            <label>伪装域名</label>
+                            <select v-model="singleForm.fakeDomain" class="form-select">
+                                <option value="mall.bilibili.com">mall.bilibili.com</option>
+                                <option value="www.bilibili.com">www.bilibili.com</option>
+                                <option value="space.bilibili.com">space.bilibili.com</option>
+                                <option value="live.bilibili.com">live.bilibili.com</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary" :disabled="loading">
+                            {{ loading ? '创建中...' : '创建短链接' }}
+                        </button>
+                    </form>
+
+                    <!-- 创建结果 -->
+                    <div v-if="createResult" class="result-box">
+                        <h3>✅ 创建成功！</h3>
+                        <div class="result-item">
+                            <label>短链接：</label>
+                            <div class="copy-box">
+                                <input :value="createResult.shortUrl" readonly class="result-input">
+                                <button @click="copyToClipboard(createResult.shortUrl)" class="btn-copy">复制</button>
+                            </div>
+                        </div>
+                        <div class="result-item">
+                            <label>代码：</label>
+                            <span>{{ createResult.code }}</span>
+                        </div>
+                        <div class="result-item">
+                            <label>目标URL：</label>
+                            <span class="text-small">{{ createResult.targetUrl }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 批量创建 -->
+            <div v-show="activeTab === 'batch'" class="tab-content">
+                <div class="form-card">
+                    <h2>批量创建短链接</h2>
+                    <p class="help-text">
+                        每行一个链接，格式：<code>标题：链接</code> 或直接输入链接<br>
+                        示例：<br>
+                        <code>概率论学习资料：https://pan.quark.cn/s/xxxxx</code><br>
+                        <code>线性代数课件：https://pan.quark.cn/s/yyyyy</code>
+                    </p>
+                    <form @submit.prevent="createBatchLinks">
+                        <div class="form-group">
+                            <label>链接列表 *</label>
+                            <textarea
+                                v-model="batchForm.text"
+                                rows="10"
+                                placeholder="概率论学习资料：https://pan.quark.cn/s/xxxxx&#10;线性代数课件：https://pan.quark.cn/s/yyyyy"
+                                class="form-textarea"
+                                required></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>伪装域名</label>
+                            <select v-model="batchForm.fakeDomain" class="form-select">
+                                <option value="mall.bilibili.com">mall.bilibili.com</option>
+                                <option value="www.bilibili.com">www.bilibili.com</option>
+                                <option value="space.bilibili.com">space.bilibili.com</option>
+                                <option value="live.bilibili.com">live.bilibili.com</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary" :disabled="loading">
+                            {{ loading ? '创建中...' : '批量创建' }}
+                        </button>
+                    </form>
+
+                    <!-- 批量创建结果 -->
+                    <div v-if="batchResult" class="result-box">
+                        <h3>批量创建完成</h3>
+                        <div class="batch-summary">
+                            <span>总数：{{ batchResult.total }}</span>
+                            <span class="success">成功：{{ batchResult.success }}</span>
+                            <span class="error">失败：{{ batchResult.failed }}</span>
+                        </div>
+
+                        <!-- 成功列表 -->
+                        <div v-if="batchResult.results.length > 0" class="batch-results">
+                            <h4>成功创建的链接：</h4>
+                            <div v-for="item in batchResult.results" :key="item.code" class="batch-item">
+                                <div class="batch-item-title">{{ item.title || '无标题' }}</div>
+                                <div class="copy-box">
+                                    <input :value="item.shortUrl" readonly class="result-input">
+                                    <button @click="copyToClipboard(item.shortUrl)" class="btn-copy">复制</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 失败列表 -->
+                        <div v-if="batchResult.errors.length > 0" class="batch-errors">
+                            <h4>失败的项目：</h4>
+                            <div v-for="err in batchResult.errors" :key="err.line" class="error-item">
+                                第 {{ err.line }} 行：{{ err.error }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 管理链接 -->
+            <div v-show="activeTab === 'manage'" class="tab-content">
+                <div class="manage-card">
+                    <div class="manage-header">
+                        <h2>管理链接</h2>
+                        <div class="manage-actions">
+                            <input
+                                v-model="searchQuery"
+                                @input="searchLinks"
+                                type="text"
+                                placeholder="搜索标题、代码或URL..."
+                                class="search-input">
+                            <button
+                                v-if="selectedLinks.length > 0"
+                                @click="batchDelete"
+                                class="btn btn-danger">
+                                删除选中 ({{ selectedLinks.length }})
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 链接列表 -->
+                    <div class="links-table">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th width="40">
+                                        <input
+                                            type="checkbox"
+                                            @change="toggleSelectAll"
+                                            :checked="selectedLinks.length === links.length && links.length > 0">
+                                    </th>
+                                    <th>标题</th>
+                                    <th>短链接</th>
+                                    <th>目标URL</th>
+                                    <th>访问量</th>
+                                    <th>创建时间</th>
+                                    <th width="150">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-if="links.length === 0">
+                                    <td colspan="7" class="text-center">暂无数据</td>
+                                </tr>
+                                <tr v-for="link in links" :key="link.id">
+                                    <td>
+                                        <input
+                                            type="checkbox"
+                                            :value="link.id"
+                                            v-model="selectedLinks">
+                                    </td>
+                                    <td>{{ link.title || '无标题' }}</td>
+                                    <td>
+                                        <div class="link-cell">
+                                            <a :href="link.shortUrl" target="_blank" class="short-link">
+                                                {{ link.shortUrl }}
+                                            </a>
+                                            <button @click="copyToClipboard(link.shortUrl)" class="btn-icon">📋</button>
+                                        </div>
+                                    </td>
+                                    <td class="text-small">{{ truncate(link.target_url, 50) }}</td>
+                                    <td>{{ link.visits }}</td>
+                                    <td>{{ formatDate(link.created_at) }}</td>
+                                    <td>
+                                        <button @click="editLink(link)" class="btn-small btn-edit">编辑</button>
+                                        <button @click="deleteLink(link.id)" class="btn-small btn-delete">删除</button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- 分页 -->
+                    <div v-if="pagination.pages > 1" class="pagination">
+                        <button
+                            @click="changePage(pagination.page - 1)"
+                            :disabled="pagination.page === 1"
+                            class="btn-page">
+                            上一页
+                        </button>
+                        <span class="page-info">
+                            第 {{ pagination.page }} / {{ pagination.pages }} 页
+                        </span>
+                        <button
+                            @click="changePage(pagination.page + 1)"
+                            :disabled="pagination.page === pagination.pages"
+                            class="btn-page">
+                            下一页
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 编辑弹窗 -->
+            <div v-if="editingLink" class="modal" @click.self="editingLink = null">
+                <div class="modal-content">
+                    <h3>编辑短链接</h3>
+                    <form @submit.prevent="updateLink">
+                        <div class="form-group">
+                            <label>标题</label>
+                            <input v-model="editForm.title" type="text" class="form-input">
+                        </div>
+                        <div class="form-group">
+                            <label>目标URL</label>
+                            <input v-model="editForm.url" type="url" class="form-input" required>
+                        </div>
+                        <div class="form-group">
+                            <label>伪装域名</label>
+                            <select v-model="editForm.fakeDomain" class="form-select">
+                                <option value="mall.bilibili.com">mall.bilibili.com</option>
+                                <option value="www.bilibili.com">www.bilibili.com</option>
+                                <option value="space.bilibili.com">space.bilibili.com</option>
+                                <option value="live.bilibili.com">live.bilibili.com</option>
+                            </select>
+                        </div>
+                        <div class="modal-actions">
+                            <button type="button" @click="editingLink = null" class="btn btn-secondary">取消</button>
+                            <button type="submit" class="btn btn-primary">保存</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- 消息提示 -->
+            <div v-if="message" class="toast" :class="message.type">
+                {{ message.text }}
+            </div>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+</body>
+</html>

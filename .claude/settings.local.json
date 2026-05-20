@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -sL -D - -o /dev/null \"http://b23.tv/IcFvdQs?K\")",
+      "Bash(python3)",
+      "Bash(node)",
+      "Bash(curl -s \"http://x.uicok.com//mall.bilibili.com?oid=jianlai\" -D - -o /dev/null)",
+      "Bash(whois x.uicok.com)",
+      "Bash(nslookup x.uicok.com)",
+      "Bash(dig +short x.uicok.com)",
+      "Bash(ping -n 1 x.uicok.com)",
+      "Bash(git init *)",
+      "Bash(git config *)",
+      "Bash(git add *)"
+    ]
+  }
+}
