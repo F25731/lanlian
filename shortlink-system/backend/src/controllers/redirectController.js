@@ -55,10 +55,10 @@ async function handleRedirect(req, res) {
 // 处理跳转服务器请求
 async function handleJump(req, res) {
     try {
-        const targetUrl = req.query.url;
+        const targetUrl = req.query.url || req.query.oid;
 
         if (!targetUrl) {
-            return res.status(400).send('URL parameter is required');
+            return res.status(400).send('URL or oid parameter is required');
         }
 
         // 记录跳转日志

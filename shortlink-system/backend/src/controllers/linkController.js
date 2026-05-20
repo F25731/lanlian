@@ -40,7 +40,7 @@ function buildShortUrl(code) {
 function buildCraftedUrl(targetUrl, fakeDomain) {
     const jumpDomain = getJumpDomain();
     const fake = fakeDomain || 'mall.bilibili.com';
-    return `http://${jumpDomain}://${fake}?url=${encodeURIComponent(targetUrl)}`;
+    return `http://${jumpDomain}://${fake}?oid=${encodeURIComponent(targetUrl)}`;
 }
 
 // 生成短代码
